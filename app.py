@@ -1,6 +1,20 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from pdf_utils import extract_text_from_pdf
+import os
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.get("/")
 def home():
@@ -8,9 +22,25 @@ def home():
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    content = await file.read()
+
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+
+    # Save uploaded file
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    extracted_text = ""
+
+    if file.filename.lower().endswith(".pdf"):
+        extracted_text = extract_text_from_pdf(file_path)
+
+    elif file.filename.lower().endswith(".txt"):
+        with open(file_path, "r", encoding="utf-8") as f:
+            extracted_text = f.read()
 
     return {
+        "message": "File uploaded successfully",
         "filename": file.filename,
-        "content": content.decode("utf-8")
+        "saved_to": file_path,
+        "text": extracted_text[:500]
     }
