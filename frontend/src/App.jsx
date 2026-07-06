@@ -1,10 +1,16 @@
+import jsPDF from "jspdf";
 import { useState } from "react";
 import "./App.css";
+import { FaHeartbeat, FaUpload } from "react-icons/fa";
 
 function App() {
   const [file, setFile] = useState(null);
-  const [result, setResult] = useState("");
+  const [text, setText] = useState("");
+  const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
 
   const uploadFile = async () => {
     if (!file) {
@@ -12,10 +18,10 @@ function App() {
       return;
     }
 
+    setLoading(true);
+
     const formData = new FormData();
     formData.append("file", file);
-
-    setLoading(true);
 
     try {
       const response = await fetch("http://127.0.0.1:8000/upload", {
@@ -24,76 +30,260 @@ function App() {
       });
 
       const data = await response.json();
-      setResult(data.summary);
+
+      setText(data.text);
+      setAnalysis(data.analysis);
     } catch (err) {
-      alert("Backend is not running!");
+      alert("Error connecting to backend.");
+      console.error(err);
     }
 
     setLoading(false);
   };
 
+  const askAI = async () => {
+  if (!question.trim()) {
+    alert("Please enter a question.");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://127.0.0.1:8000/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        report_text: text,
+        question: question,
+      }),
+    });
+
+    const data = await response.json();
+    setAnswer(data.answer);
+  } catch (error) {
+    console.error(error);
+    alert("Failed to get AI response.");
+  }
+};
+
+  const healthScore = analysis?.health_score || (
+    analysis?.risk_level === "Low"
+      ? 90
+      : analysis?.risk_level === "Medium"
+      ? 70
+      : analysis?.risk_level === "High"
+      ? 45
+      : 0
+  );
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div className="app">
 
-      {/* Navbar */}
-      <nav className="flex justify-between items-center px-10 py-6">
-        <h1 className="text-3xl font-bold text-cyan-400">
-          🩺 AI Health Companion
-        </h1>
-      </nav>
+      <h1>
+        <FaHeartbeat className="logo" />
+        AI Health Companion
+      </h1>
 
-      {/* Hero */}
-      <div className="text-center mt-10">
+      <p className="subtitle">
+        Upload your medical report and receive AI-powered health insights.
+      </p>
 
-        <h2 className="text-5xl font-bold">
-          Understand Medical Reports
-          <span className="text-cyan-400"> with AI</span>
-        </h2>
+      <div className="upload-card">
 
-        <p className="text-gray-400 mt-4">
-          Upload your report and get AI-powered insights instantly.
-        </p>
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files[0])}
+        />
 
-        <div className="mt-10 flex justify-center gap-4">
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="bg-white text-black rounded p-2"
-          />
-
-          <button
-            onClick={uploadFile}
-            className="bg-cyan-500 hover:bg-cyan-600 px-6 py-2 rounded-lg"
-          >
-            Analyze Report
-          </button>
-        </div>
+        <button onClick={uploadFile}>
+          <FaUpload /> Analyze Report
+        </button>
 
       </div>
 
-      {/* Result Card */}
+      {loading && (
+        <div className="loading">
+          🤖 AI is analyzing your report...
+        </div>
+      )}
 
-      <div className="max-w-5xl mx-auto mt-16">
+      {analysis && (
+        <div className="card health-card">
 
-        <div className="bg-slate-800 rounded-2xl p-8 shadow-xl">
+          <h2>❤️ Overall Health</h2>
 
-          <h2 className="text-3xl font-bold text-cyan-400 mb-6">
-            🤖 AI Analysis
-          </h2>
+          <h1>{healthScore}/100</h1>
 
-          {loading ? (
-            <p className="text-xl animate-pulse">
-              Analyzing Report...
-            </p>
+          <h3>
+            {analysis.risk_level === "Low" && "🟢 Low Risk"}
+            {analysis.risk_level === "Medium" && "🟡 Medium Risk"}
+            {analysis.risk_level === "High" && "🔴 High Risk"}
+          </h3>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+          <h2>📋 Quick Summary</h2>
+          <p>{analysis.summary}</p>
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>⚠️ Needs Attention</h2>
+
+          {(analysis.abnormal_values || []).length === 0 ? (
+            <p>✅ No abnormal values detected.</p>
           ) : (
-            <pre className="whitespace-pre-wrap">
-              {result}
-            </pre>
+            <ul>
+              {analysis.abnormal_values.map((item, index) => (
+                <li key={index}>
+                  <strong>{item.test_name}</strong>
+
+                  <br />
+
+                  <b>Result:</b> {item.result}
+
+                  <br />
+
+                  <b>Reference:</b> {item.reference_range}
+
+                  <br />
+
+                  <b>Status:</b> {item.interpretation}
+                </li>
+              ))}
+            </ul>
           )}
 
         </div>
+      )}
 
+      {analysis && (
+        <div className="card">
+
+          <h2>💡 Recommendations</h2>
+
+          <ul>
+            {(analysis.recommendations || []).map((item, index) => (
+              <li key={index}>✅ {item}</li>
+            ))}
+          </ul>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>🥗 Diet Suggestions</h2>
+
+          <ul>
+            {(analysis.diet || []).map((item, index) => (
+              <li key={index}>🥬 {item}</li>
+            ))}
+          </ul>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>🚫 Foods To Avoid</h2>
+
+          <ul>
+            {(analysis.foods_to_avoid || []).map((item, index) => (
+              <li key={index}>❌ {item}</li>
+            ))}
+          </ul>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>🏃 Exercise & Lifestyle</h2>
+
+          <ul>
+            {(analysis.exercise || []).map((item, index) => (
+              <li key={index}>🏃 {item}</li>
+            ))}
+          </ul>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>👨‍⚕️ Doctor Advice</h2>
+
+          <p>{analysis.doctor_visit}</p>
+
+        </div>
+      )}
+
+      {analysis && (
+        <div className="card">
+
+          <h2>❓ Questions To Ask Your Doctor</h2>
+
+          <ul>
+            {(analysis.questions_for_doctor || []).map((item, index) => (
+              <li key={index}>❓ {item}</li>
+            ))}
+          </ul>
+
+        </div>
+      )}
+
+      {text && (
+        <div className="card">
+
+          <h2>📄 Original Report</h2>
+
+          <button onClick={() => setShowReport(!showReport)}>
+            {showReport ? "Hide Report ▲" : "View Original Report ▼"}
+          </button>
+
+          {showReport && <pre>{text}</pre>}
+
+        </div>
+      )}
+      {analysis && (
+  <div className="card">
+    <h2>💬 Ask AI About Your Report</h2>
+
+    <input
+      type="text"
+      placeholder="Example: Can I eat eggs?"
+      value={question}
+      onChange={(e) => setQuestion(e.target.value)}
+      className="chat-input"
+    />
+
+    <button onClick={askAI} style={{ marginTop: "15px" }}>
+      Ask AI
+    </button>
+
+    {answer && (
+      <div style={{ marginTop: "20px" }}>
+        <h3>🤖 AI Answer</h3>
+        <p>{answer}</p>
       </div>
+    )}
+  </div>
+)}
+
+      <footer className="footer">
+        Made with ❤️ using React + FastAPI + Gemini AI
+      </footer>
 
     </div>
   );
