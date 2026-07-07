@@ -14,19 +14,14 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    app.add_middleware(
-    CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://ai-healthcompanion.vercel.app"
+        "https://ai-healthcompanion.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+
 )
 
 UPLOAD_FOLDER = "uploads"
