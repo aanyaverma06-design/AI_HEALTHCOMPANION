@@ -1,5 +1,0 @@
-Patient: Aanya
-Hemoglobin: 16
-Vitamin D: Low
-Glucose: 98
-Creatinine:0.7
